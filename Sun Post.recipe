@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+# vim:fileencoding=utf-8
+from calibre.web.feeds.news import BasicNewsRecipe
+from datetime import datetime, timedelta
+import json
+
+class SunPost(BasicNewsRecipe):
+    title = 'Sun Post'
+    __author__ = 'Andrew Johnson'
+    description = 'The Sun Post is a community news source for the northwest suburbs of Minneapolis, Minnesota.'
+    publisher = 'Adams Publishing Group'
+    category = 'news'
+    oldest_article = 30
+    max_articles_per_feed = 100
+    auto_cleanup = True
+    language = 'en'
+    publication_type = 'newspaper'
+    masthead_url = 'https://bloximages.chicago2.vip.townnews.com/hometownsource.com/content/tncms/custom/image/80247816-04e0-11eb-bb03-a35de7ca2cf5.png'
+    conversion_options = {
+        'comment': description, 'tags': category, 'publisher': publisher, 'language': language, 'linearize_tables': True
+    }
+    
+    @property
+    def feeds(self):
+        today = datetime.now()
+        start_date = (today - timedelta(days=self.oldest_article)).strftime('%Y-%m-%d')
+        end_date = today.strftime('%Y-%m-%d')
+        feed_url = f'https://www.hometownsource.com/search/?f=json&t=article&c[]=sun_post,sun_post/free,sun_post/community/brooklyncenter,sun_post/community/brooklynpark&nc[]=sun_post/community/crystal_robbinsdale,sun_post/community/newhope_goldenvalley&d1={start_date}&d2={end_date}&l={self.max_articles_per_feed}&s=start_time&sd=desc'
+        return [('Sun Post', feed_url)]
+        
+    def parse_index(self):
+        articles = []
+        for feed in self.feeds:
+            response = self.browser.open(feed[1])
+            json_data = json.loads(response.read())
+            for row in json_data['rows']:
+                article_date = datetime.strptime(row['starttime']['rfc2822'], '%a, %d %b %Y %H:%M:%S %z').strftime('%A, %B %d, %Y')
+                article_content = f"<p><em>{article_date}</em></p>{''.join(row.get('content', ''))}"
+                article_content = article_content.replace('’', '\'')
+                
+                article = {
+                    'title': row['title'],
+                    'url': row['url'],
+                    'date': '',
+                    'description': '',
+                    'content': article_content
+                }
+                articles.append(article)
+        return [('Articles', articles)]
